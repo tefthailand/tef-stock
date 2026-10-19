@@ -1,17 +1,20 @@
 /*
- * TEF Stock · tef-api.js (v33)
+ * TEF Stock · tef-api.js (v35)
  *   1 TEFAPI.call(fn, args)  ส่งคำสั่งไปหลังบ้าน Apps Script (POST text/plain) พร้อมบัตรผ่าน
  *   2 google.script.run      ตัวครอบ: โค้ดหน้าเว็บเดิมเรียกแบบเดิมได้ทุกบรรทัด
- *   3 TEFAuth                ปุ่ม Sign in with Google · ต่ออายุบัตรแบบเงียบ · รหัสทางอีเมล (ทางสำรอง) · ออกจากระบบ
+ *   3 TEFAuth                ปุ่ม Sign in with Google · รหัสทางอีเมล (ทางสำรอง) · ออกจากระบบ
+ *   v35: กดปุ่ม Google แล้วแลกบัตร Google (1 ชม.) เป็นบัตรผ่านของระบบ 6 ชม. ทันที (googleSession)
+ *        ไม่ต้องต่ออายุแบบเงียบทุกชั่วโมงอีก (iPhone/Safari ต่อไม่ได้ → เคยเด้งไปหน้า Login ตอนกดตะกร้า)
  * ใส่ใน <head> ก่อนสคริปต์อื่น: config.js → tef-api.js → i18n.js → tef-shell.js → accounts.google.com/gsi/client
- * ที่เก็บในเบราว์เซอร์: localStorage tef_idt (บัตร Google ≤ 1 ชม.), tef_ses (บัตรผ่านรหัสทางอีเมล 6 ชม.), tef_names (ชื่อสินค้าอังกฤษ)
+ * ที่เก็บในเบราว์เซอร์: localStorage tef_ses (บัตรผ่านของระบบ 6 ชม.), tef_by (GOOGLE/EMAIL), tef_names (ชื่อสินค้าอังกฤษ)
+ *                      tef_idt (บัตร Google แบบเดิม ≤ 1 ชม. เหลือเฉพาะเครื่องที่เข้าก่อน v35 จะถูกแลกเป็นบัตรผ่านอัตโนมัติ)
  *                      sessionStorage tef_me (ชื่อ/บทบาท จำไว้ 5 นาที)
  */
 (function () {
   'use strict';
   var C = window.TEF_CONFIG || {};
-  var K_IDT = 'tef_idt', K_SES = 'tef_ses', K_ME = 'tef_me', K_NAMES = 'tef_names';
-  var PRE = { apiPing: 1, otpRequest: 1, otpVerify: 1, sessionCheck: 1, otpLogout: 1 };
+  var K_IDT = 'tef_idt', K_SES = 'tef_ses', K_BY = 'tef_by', K_ME = 'tef_me', K_NAMES = 'tef_names';
+  var PRE = { apiPing: 1, otpRequest: 1, otpVerify: 1, sessionCheck: 1, otpLogout: 1, googleSession: 1 };
   // หน้าในระบบ (ชื่อเดิมของ ?page=) → ไฟล์บน GitHub Pages
   var PAGES = { home: 'home.html', stock: 'stock.html', index: 'request.html', count: 'count.html',
                 dash: 'dash.html', admin: 'admin.html', my: 'my.html', survey: 'survey.html' };
@@ -40,8 +43,27 @@
   }
   function freshIdt() { var t = ls(K_IDT); return t && jwtExp(t) > Date.now() / 1000 + 60 ? t : ''; }
   function cred() {
-    var t = freshIdt(); if (t) return { idt: t };
-    var s = ls(K_SES); return s ? { ses: s } : {};
+    var s = ls(K_SES); if (s) return { ses: s };
+    var t = freshIdt(); return t ? { idt: t } : {};
+  }
+  function forget() {
+    ls(K_IDT, null); ls(K_SES, null); ls(K_BY, null); ss(K_ME, null);
+    try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf(K_C) === 0) localStorage.removeItem(k); }); } catch (e) {}
+  }
+
+  /** v35: แลกบัตร Google เป็นบัตรผ่านของระบบ 6 ชม. */
+  function exchange(t) {
+    return postRetry('googleSession', [t]).then(function (r) {
+      ls(K_SES, r.tok); ls(K_BY, 'GOOGLE'); ls(K_IDT, null); ss(K_ME, null);
+      return r;
+    });
+  }
+  /** เครื่องที่ยังเก็บบัตร Google แบบเดิม: ยังไม่หมดอายุ → แลกเป็นบัตรผ่าน · หมดแล้ว → ลบทิ้ง (ไปหน้า Login ทันที ไม่ต้องรอ) */
+  function upgrade() {
+    var t = ls(K_IDT);
+    if (!t || ls(K_SES)) return Promise.resolve();
+    if (!freshIdt()) { ls(K_IDT, null); return Promise.resolve(); }
+    return exchange(t).catch(function () {});        // แลกไม่ได้ (หลังบ้านรุ่นเก่า/เน็ตหลุด) → ใช้บัตร Google ต่อไปจนหมดอายุ
   }
 
   function post(fn, args) {
@@ -55,7 +77,9 @@
       redirect: 'follow', credentials: 'omit', cache: 'no-store'
     }).then(function (r) {
       if (!r.ok) throw mkErr('NETWORK', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (' + r.status + ') กรุณาลองใหม่');
-      return r.json();
+      return r.json().catch(function () {               // v35.1: Google ตอบหน้า error แทน JSON (ขัดข้องชั่วคราว)
+        throw mkErr('NETWORK', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองใหม่');
+      });
     }, function () {
       throw mkErr('NETWORK', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองใหม่');
     }).then(function (res) {
@@ -64,19 +88,85 @@
     });
   }
 
-  /** เรียกหลังบ้าน: บัตร Google ใกล้หมด → ต่ออายุก่อน · หลังบ้านตอบหมดอายุ → ต่ออายุแล้วลองซ้ำ 1 ครั้ง */
+  /**
+   * v35.1 ลองใหม่อัตโนมัติ: Apps Script บางช่วงตอบช้า 20–35 วิ หรือตอบหน้า error ของ Google (วัดจริง 19 ต.ค. 23:00)
+   * เฉพาะคำสั่งอ่านอย่างเดียว ลองอีก 2 ครั้ง (รอ 1.5 วิ และ 4 วิ) · คำสั่งบันทึกไม่ลองซ้ำ กันบันทึกซ้ำ
+   */
+  var SAFE = { apiPing: 1, sessionCheck: 1, googleSession: 1, meInfo: 1, namesEn: 1, appUrl: 1, homeBoot: 1, getBoot: 1,
+               myRequests: 1, surveyBoot: 1, stockList: 1, stockPhotos: 1, radioUnitList: 1, listItems: 1, requestBoot: 1,
+               getRequisition: 1, getPrintHtml: 1, listPending: 1, getBootstrapData: 1, countListItems: 1, getItem: 1,
+               getProgress: 1, facetData: 1, dashData: 1, adminBoot: 1, reqDocument: 1 };
+  var WAIT = [1500, 4000];
+  function postRetry(fn, args, n) {
+    n = n || 0;
+    return post(fn, args).catch(function (e) {
+      if (e && e.code === 'NETWORK' && SAFE[fn] && n < WAIT.length)
+        return new Promise(function (ok) { setTimeout(ok, WAIT[n]); }).then(function () { return postRetry(fn, args, n + 1); });
+      throw e;
+    });
+  }
+
+  /** เรียกหลังบ้าน · บัตรหมดอายุหรือไม่มีบัตร → ลบบัตรในเครื่อง แล้วไปหน้าเข้าสู่ระบบพร้อมจำหน้าเดิม (ตะกร้าอยู่ใน ?add= ไม่หาย) */
   function call(fn, args) {
-    if (PRE[fn]) return post(fn, args);
-    var ready = (ls(K_IDT) && !freshIdt()) ? Auth.renew().catch(function () {}) : Promise.resolve();
-    return ready.then(function () { return post(fn, args); })
+    if (PRE[fn]) return postRetry(fn, args);
+    return upgrade().then(function () { return postRetry(fn, args); })
       .catch(function (e) {
-        if (e.code === 'AUTH_EXPIRED' && ls(K_IDT)) return Auth.renew().then(function () { return post(fn, args); });
-        throw e;
-      })
-      .catch(function (e) {
-        if (/^AUTH_/.test(e.code || '')) Auth.toLogin();
+        if (/^AUTH_/.test(e.code || '')) { forget(); Auth.toLogin('expired'); }
         throw e;
       });
+  }
+
+  // ── v35 ความเร็ว: จำข้อมูลไว้ในเครื่อง แสดงทันที แล้วอัปเดตจากหลังบ้าน ─────────────
+  // ข้อมูลพัสดุ/คงเหลือของหน้าเว็บ (ไม่ใช่รหัสผ่าน) · ลบทั้งหมดเมื่อออกจากระบบหรือหมดเวลาเข้าใช้ · ยอดจริงตรวจที่หลังบ้านตอนบันทึกเสมอ
+  var K_C = 'tef_c_', C_AGE = 24 * 3600000;
+  function cacheRead(key) {
+    try { var o = JSON.parse(ls(K_C + key) || 'null'); if (o && o.t > Date.now() - C_AGE) return o; } catch (e) {}
+    return null;
+  }
+  function cacheWrite(key, d) {
+    try { localStorage.setItem(K_C + key, JSON.stringify({ t: Date.now(), d: d })); } catch (e) { /* ที่เก็บเต็ม: ข้าม */ }
+  }
+  /** onData(data, fromCache, savedAt) ถูกเรียกได้ 2 ครั้ง: ของที่จำไว้ (ถ้ามี) ทันที แล้วของใหม่จากหลังบ้าน
+   *  onFail(err, hadCache) ถ้าโหลดใหม่ไม่ได้ */
+  function fresh(key, fn, args, onData, onFail) {
+    var c = cacheRead(key);
+    if (c) { try { onData(c.d, true, c.t); } catch (e) { if (window.console) console.error('[TEF] cache', key, e); } }
+    return call(fn, args || []).then(function (d) {
+      cacheWrite(key, d); onData(d, false, Date.now()); return d;
+    }, function (e) { if (onFail) onFail(e, !!c); else if (window.console) console.error('[TEF]', fn, e); });
+  }
+  // รูปพัสดุ: จำใน IndexedDB ตามรหัส + เวลาบันทึกรูป (เปลี่ยนรูปแล้วโหลดใหม่เอง)
+  var idbP = null;
+  function idb() {
+    if (!idbP) idbP = new Promise(function (ok, no) {
+      try {
+        var r = indexedDB.open('tef', 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore('ph'); };
+        r.onsuccess = function () { ok(r.result); };
+        r.onerror = function () { no(r.error); };
+      } catch (e) { no(e); }
+    });
+    return idbP;
+  }
+  /** list = [{c: รหัส, v: เวลารูป}] → Promise {รหัส: dataURL} เฉพาะที่จำไว้และยังเป็นรูปเดิม */
+  function photoGet(list) {
+    if (!list.length) return Promise.resolve({});
+    return idb().then(function (d) {
+      return new Promise(function (ok) {
+        var out = {}, n = list.length, st = d.transaction('ph', 'readonly').objectStore('ph');
+        list.forEach(function (x) {
+          var q = st.get(x.c);
+          q.onsuccess = function () { var v = q.result; if (v && x.v && v.v === x.v) out[x.c] = v.u; if (--n === 0) ok(out); };
+          q.onerror = function () { if (--n === 0) ok(out); };
+        });
+      });
+    }).catch(function () { return {}; });
+  }
+  function photoPut(m, vmap) {
+    idb().then(function (d) {
+      var st = d.transaction('ph', 'readwrite').objectStore('ph');
+      Object.keys(m).forEach(function (c) { if (vmap[c]) st.put({ v: vmap[c], u: m[c] }, c); });
+    }).catch(function () {});
   }
 
   // ── ตัวครอบ google.script.run ──────────────────────────────────
@@ -113,7 +203,7 @@
   window.onGoogleLibraryLoad = function () { install(); if (typeof prevLoad === 'function') prevLoad(); };
 
   // ── เข้าสู่ระบบ ───────────────────────────────────────────────
-  var inited = false, renewing = null, pending = null;
+  var inited = false;
   function gis() { return window.google && google.accounts && google.accounts.id; }
   function whenGis(ms) {
     return new Promise(function (ok, no) {
@@ -131,19 +221,30 @@
     id.initialize({
       client_id: C.CLIENT_ID,
       callback: onCredential,
-      auto_select: true,              // เคยเข้าแล้ว ต่ออายุได้เองโดยไม่ต้องกดซ้ำ (ถ้าเบราว์เซอร์อนุญาต)
+      auto_select: true,              // เคยเข้าแล้ว กดปุ่มครั้งเดียวไม่ต้องเลือกบัญชีซ้ำ (ถ้าเบราว์เซอร์อนุญาต)
       cancel_on_tap_outside: false,
       use_fedcm_for_prompt: true,
       itp_support: true,
       context: 'signin'
     });
   }
+  /** กดปุ่ม Google สำเร็จ → แลกเป็นบัตรผ่าน 6 ชม. แล้วค่อยไปต่อ */
   function onCredential(r) {
     var t = r && r.credential;
     if (!t) return;
-    ls(K_IDT, t); ls(K_SES, null); ss(K_ME, null);
-    if (pending) pending(t);
-    if (typeof Auth.onSignIn === 'function') Auth.onSignIn(t);
+    ss(K_ME, null);
+    if (typeof Auth.onSignInStart === 'function') Auth.onSignInStart();
+    exchange(t).then(function () {
+      if (typeof Auth.onSignIn === 'function') Auth.onSignIn();
+    }, function (e) {
+      if (e && (e.code === 'NOT_ALLOWED' || e.code === 'AUTH_REQUIRED')) {   // หลังบ้านยังเป็นรุ่นก่อน v35 (ไม่รู้จัก googleSession): ใช้บัตร Google แบบเดิม
+        ls(K_IDT, t); ls(K_SES, null); ls(K_BY, null);
+        if (typeof Auth.onSignIn === 'function') Auth.onSignIn();
+        return;
+      }
+      if (typeof Auth.onSignInFail === 'function') Auth.onSignInFail(e);
+      else if (window.console) console.error('[TEF] googleSession', e);
+    });
   }
   function pageKey() {
     var f = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
@@ -152,7 +253,9 @@
   }
 
   var Auth = {
-    onSignIn: null,                   // หน้าเข้าสู่ระบบตั้งค่าเอง
+    onSignIn: null,                   // หน้าเข้าสู่ระบบตั้งค่าเอง: เข้าได้แล้ว
+    onSignInFail: null,               // หน้าเข้าสู่ระบบตั้งค่าเอง: แลกบัตรไม่สำเร็จ (ไม่มีสิทธิ์ เน็ตหลุด)
+    googleSession: function (t) { return exchange(t); },
 
     renderButton: function (el, lang) {
       return whenGis(10000).then(function (id) {
@@ -162,26 +265,10 @@
       });
     },
 
-    /** ขอบัตรใหม่แบบเงียบ (One Tap / FedCM) รอไม่เกิน 8 วินาที */
-    renew: function () {
-      if (renewing) return renewing;
-      renewing = whenGis(5000).then(function (id) {
-        init(id);
-        return new Promise(function (ok, no) {
-          var tm = setTimeout(function () { pending = null; no(mkErr('AUTH_EXPIRED', 'กรุณาเข้าสู่ระบบอีกครั้ง')); }, 8000);
-          pending = function (t) { clearTimeout(tm); pending = null; ok(t); };
-          id.prompt();
-        });
-      });
-      var done = function () { renewing = null; };
-      renewing.then(done, done);
-      return renewing;
-    },
-
     otpRequest: function (email) { return call('otpRequest', [email]); },
     otpVerify: function (email, code) {
       return call('otpVerify', [email, code]).then(function (r) {
-        ls(K_SES, r.tok); ls(K_IDT, null); ss(K_ME, null);
+        ls(K_SES, r.tok); ls(K_BY, 'EMAIL'); ls(K_IDT, null); ss(K_ME, null);
         return r;
       });
     },
@@ -204,8 +291,8 @@
       });
     },
 
-    signedIn: function () { return !!(freshIdt() || ls(K_SES) || ls(K_IDT)); },
-    authBy: function () { return freshIdt() || ls(K_IDT) ? 'GOOGLE' : (ls(K_SES) ? 'EMAIL' : ''); },
+    signedIn: function () { return !!(ls(K_SES) || freshIdt()); },
+    authBy: function () { return ls(K_SES) ? (ls(K_BY) || 'EMAIL') : (freshIdt() ? 'GOOGLE' : ''); },
 
     /** ไปหน้าเข้าสู่ระบบ แล้วกลับมาหน้าเดิม (พร้อมค่าใน ?) หลังเข้าได้ */
     toLogin: function (reason) {
@@ -219,7 +306,7 @@
     /** ล้างบัตรในเบราว์เซอร์นี้ (ใช้ทั้งออกจากระบบและสลับบัญชี) */
     clear: function () {
       var s = ls(K_SES);
-      ls(K_IDT, null); ls(K_SES, null); ss(K_ME, null);
+      forget();
       try { if (gis()) gis().disableAutoSelect(); } catch (e) {}
       return s ? post('otpLogout', [s]).catch(function () {}) : Promise.resolve();
     },
@@ -229,7 +316,8 @@
     }
   };
 
-  window.TEFAPI = { call: call, PAGES: PAGES, pageKey: pageKey, url: function (page, q) {
+  window.TEFAPI = { call: call, fresh: fresh, cacheRead: cacheRead, photoGet: photoGet, photoPut: photoPut,
+                    PAGES: PAGES, pageKey: pageKey, url: function (page, q) {
     var f = PAGES[page] || 'index.html'; return C.SITE + f + (q ? '?' + q : '');
   } };
   window.TEFAuth = Auth;
