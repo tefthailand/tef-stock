@@ -96,7 +96,7 @@ body{background:var(--tef-bg);color:var(--tef-text);font-family:var(--tef-font);
         <textarea class="form-control" id="fPurpose" rows="3" placeholder="เช่น ยืมอุปกรณ์ไปใช้ในการแข่งขัน รายการ... วันที่..."></textarea>
       </div>
     </div>
-    <div class="form-check mt-3"><input class="form-check-input" type="checkbox" id="fPdpa">
+
       <label class="form-check-label" for="fPdpa">ข้าพเจ้ารับทราบ<a href="privacy.html" target="_blank" rel="noopener">นโยบายความเป็นส่วนตัว</a></label></div>
     <button class="btn btn-tef mt-3" id="btnSave" onclick="save()">บันทึกและเข้าใช้งานระบบ</button>
     <div class="msg" id="msg"></div>
@@ -127,7 +127,7 @@ window.addEventListener('DOMContentLoaded', function(){
 });
 
 function save(){
-  if (!$('fPdpa').checked) { showMsg((window.TEF_LANG === 'en' && window.TEF_T ? TEF_T('กรุณาทำเครื่องหมายรับทราบนโยบายความเป็นส่วนตัว') : 'กรุณาทำเครื่องหมายรับทราบนโยบายความเป็นส่วนตัว'), 'err'); return; }
+
   var want = Array.prototype.slice.call(document.querySelectorAll('input[name=want]:checked')).map(function(x){ return x.value; });
   var d = { name: $('fName').value, phone: $('fPhone').value, org: $('fOrg').value, purpose: $('fPurpose').value, want: want };
   $('btnSave').disabled = true; $('msg').className = 'msg';
