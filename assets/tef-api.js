@@ -95,7 +95,7 @@
    */
   var SAFE = { apiPing: 1, sessionCheck: 1, googleSession: 1, meInfo: 1, namesEn: 1, appUrl: 1, homeBoot: 1, getBoot: 1,
                myRequests: 1, surveyBoot: 1, stockList: 1, stockPhotos: 1, radioUnitList: 1, listItems: 1, requestBoot: 1,
-               getRequisition: 1, getPrintHtml: 1, listPending: 1, getBootstrapData: 1, countListItems: 1, getItem: 1,
+               getRequisition: 1, getPrintHtml: 1, listPending: 1, stockPhotoSet: 1, getBootstrapData: 1, countListItems: 1, getItem: 1,
                getProgress: 1, facetData: 1, dashData: 1, adminBoot: 1, reqDocument: 1 };
   var WAIT = [1500, 4000];
   /**
