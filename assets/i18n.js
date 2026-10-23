@@ -220,6 +220,8 @@ var D = {
 'พิมพ์ TEF- หรือชื่อของ เช่น เสื้อโปโล': 'Type TEF- or an item name, e.g. polo shirt', 'ชื่อผู้นับรอบนี้': 'Counter name', 'เลือกสถานะ': 'Choose status',
 'กรุณาเลือกรายการก่อน': 'Please choose an item first', 'กำลังบันทึกลงชีต…': 'Saving to sheet…', 'ยอดเดิม': 'Previous balance', 'ไม่ทราบ': 'Unknown',
 'ดึงข้อมูลไม่สำเร็จ': 'Could not fetch data', 'ยังไม่มีในทะเบียน': 'Not in register', 'นับแล้ว': 'Counted',
+'กำลังโหลดรูป…': 'Loading photo…', 'ยังไม่มีรูปของรายการนี้': 'No photo for this item',
+'โหลดรูปไม่สำเร็จ ลองเลือกใหม่อีกครั้ง': 'Could not load photo. Try selecting again',
 // ── สรุปภาพรวม (เฟส 1) ──
 'แดชบอร์ดตรวจนับพัสดุ': 'Stock Count Dashboard', 'อ่านยอดใหม่': 'Refresh', 'ยอดของรายการที่ตรวจนับไปแล้ว': 'Totals for counted items',
 'นับได้จริงรอบนี้': 'Counted this round', 'นับได้เกินยอดเดิม': 'Counted above previous balance', 'แยกตามหมวดหลัก': 'By main category', 'นับได้': 'Counted',
