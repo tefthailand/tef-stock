@@ -155,6 +155,7 @@
     try { var o = JSON.parse(ls(K_C + key) || 'null'); if (o && o.t > Date.now() - C_AGE) return o; } catch (e) {}
     return null;
   }
+  function cacheForget(key) { try { localStorage.removeItem(K_C + key); } catch (e) {} }
   function cacheWrite(key, d) {
     try { localStorage.setItem(K_C + key, JSON.stringify({ t: Date.now(), d: d })); } catch (e) { /* ที่เก็บเต็ม: ข้าม */ }
   }
@@ -354,7 +355,7 @@
     }
   };
 
-  window.TEFAPI = { call: call, fresh: fresh, cacheRead: cacheRead, remember: cacheWrite, mine: mine, photoGet: photoGet, photoPut: photoPut,
+  window.TEFAPI = { call: call, fresh: fresh, cacheRead: cacheRead, remember: cacheWrite, invalidate: cacheForget, mine: mine, photoGet: photoGet, photoPut: photoPut,
                     PAGES: PAGES, pageKey: pageKey, url: function (page, q) {
     var f = PAGES[page] || 'index.html'; return C.SITE + f + (q ? '?' + q : '');
   } };
