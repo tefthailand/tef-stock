@@ -722,13 +722,13 @@ function onBoot(b, items){
   }
 
   $('appWrap').style.display = '';
-  if (/^EXTERNAL/.test(String(b.me.role || ''))) {                  // v34 แบบ ข.: ภายนอกขอจ่ายออกเองไม่ได้
+  if (String(b.me.role || '').toUpperCase() !== 'ADMIN'){    document.querySelectorAll('.tef-tab[data-m="dis"]').forEach(x => x.style.display = 'none');  }  if (/^EXTERNAL/.test(String(b.me.role || ''))) {                  // v34 แบบ ข.: ภายนอกขอจ่ายออกเองไม่ได้
     const g = $('rKindGive'); if (g) { g.closest('label').style.display = 'none'; $('rKindBorrow').checked = true; syncKind(); }
   }
   const via = (b.me.authBy || (window.TEFAuth ? TEFAuth.authBy() : '')) === 'EMAIL' ? 'ยืนยันด้วยรหัสทางอีเมล' : 'ยืนยันด้วยบัญชี Google';   // v35
   $('who').textContent = ['ผู้ใช้ ' + b.me.name, b.me.position, b.me.absolute ? 'มีสิทธิ์ขาด' : '', via].filter(Boolean).join(' · ');
 
-  if (String(b.me.role || '').toUpperCase() !== 'ADMIN'){    document.querySelectorAll('.tef-tab[data-m="dis"]').forEach(x => x.style.display = 'none');  }  if (b.me.external){
+  if (b.me.external){
     document.querySelectorAll('.tef-tab[data-m="dis"],.tef-tab[data-m="mov"]').forEach(x => x.style.display = 'none');
     const rt = document.querySelector('.tef-tab[data-m="ret"]');
     if (rt) rt.innerHTML = 'แจ้งคืน<small>รอแอดมินตรวจรับ</small>';
@@ -789,9 +789,9 @@ function esc(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function setMode(m){
+function setMode(m){  if (m === 'dis' && (!BOOT || !BOOT.me || String(BOOT.me.role || '').toUpperCase() !== 'ADMIN')) m = 'req';
   setTimeout(() => { if (typeof drawUnits === 'function') drawUnits(); }, 0);
-  if (m === 'dis' && (!BOOT || !BOOT.me || String(BOOT.me.role || '').toUpperCase() !== 'ADMIN')) m = 'req';  MODE = m;
+  MODE = m;
   document.querySelectorAll('.tef-tab').forEach(b => b.classList.toggle('on', b.dataset.m === m));
   $('formReq').style.display = m === 'req' ? '' : 'none';
   $('formRet').style.display = m === 'ret' ? '' : 'none';
