@@ -234,8 +234,9 @@ function twoStep(btn, confirmText, run){
   var orig = btn.textContent;
   btn.addEventListener('click', function(){
     if (btn.disabled) return;
-    openConfirmModal(confirmText + ' / Please confirm this action.', function(){
-      btn.disabled = true; btn.textContent = 'กำลังดำเนินการ…'; run(btn, orig);
+    var msg = window.TEF_LANG === 'en' && window.TEF_T ? window.TEF_T(confirmText) : confirmText;
+    openConfirmModal(msg, function(){
+      btn.disabled = true; btn.textContent = homeTx('กำลังดำเนินการ…', 'Processing…'); run(btn, orig);
     });
   });
 }
@@ -287,7 +288,10 @@ function renderHomeHero(app){
   if (displayName) copy.appendChild(el('div', 'hero-name', displayName));
   copy.appendChild(el('div', 'hero-sub', roleDescription(kind)));
   var role = el('div', 'hero-role');
-  role.appendChild(el('span', 'chip', (B.roleLabel || homeTx('ผู้ใช้งาน', 'User')) + ' / ' + roleEnglish(kind)));
+  var roleText = window.TEF_LANG === 'en'
+    ? (window.TEF_T && B.roleLabel ? window.TEF_T(B.roleLabel) : roleEnglish(kind))
+    : (B.roleLabel || 'ผู้ใช้งาน');
+  role.appendChild(el('span', 'chip', roleText));
   if (B.email) role.appendChild(document.createTextNode('  ' + B.email));
   copy.appendChild(role);
   hero.appendChild(copy);
@@ -348,29 +352,29 @@ function renderMainTasks(app){
     if (hasMenuPage('stock')) tasks.push([pageHref('stock'), '🔎', homeTx('ค้นหาพัสดุ', 'Browse inventory'), homeTx('ดูรายการพัสดุที่เปิดให้ค้นหา', 'Browse items available to search')]);
   }
   if (!tasks.length) return;
-  app.appendChild(section('งานหลักของคุณ / Main tasks', null, 'sec-main-tasks'));
+  app.appendChild(section(homeTx('งานหลักของคุณ', 'Main tasks'), null, 'sec-main-tasks'));
   var g = el('div', 'grid home-task-grid');
   tasks.forEach(function(t){ g.appendChild(homeTask(t[0], t[1], t[2], t[3])); });
   app.appendChild(g);
 }
 function renderUserStatus(app){
   if (B.isAdmin) return;
-  app.appendChild(section('สถานะคำขอ / Request status', null, 'sec-user-status'));
+  app.appendChild(section(homeTx('สถานะคำขอ', 'Request status'), null, 'sec-user-status'));
   var g = el('div', 'grid home-status');
   var cards = [];
   if (B.status && Array.isArray(B.status.cards)) cards = B.status.cards;
   if (!cards.length && B.myRequestsCount != null) {
-    cards.push({title:'คำขอของฉัน', copy:'มี ' + B.myRequestsCount + ' รายการในระบบ', href:hasMenuPage('my') ? pageHref('my') : ''});
+    cards.push({title:homeTx('คำขอของฉัน', 'My Requests'), copy:homeTx('มี ' + B.myRequestsCount + ' รายการในระบบ', B.myRequestsCount + ' request(s) in the system'), href:hasMenuPage('my') ? pageHref('my') : ''});
   }
   if (!cards.length) {
-    cards.push({title:'ติดตามงานของคุณ', copy:'สถานะเอกสารจะแสดงในหน้า “คำขอของฉัน” เมื่อมีรายการที่ส่งเข้าระบบ', href:hasMenuPage('my') ? pageHref('my') : pageHref('index')});
+    cards.push({title:homeTx('ติดตามงานของคุณ', 'Track your requests'), copy:homeTx('สถานะเอกสารจะแสดงในหน้า “คำขอของฉัน” เมื่อมีรายการที่ส่งเข้าระบบ', 'Document status will appear in “My Requests” once you submit a request.'), href:hasMenuPage('my') ? pageHref('my') : pageHref('index')});
   }
   cards.forEach(function(c){
     var box = el('div', 'card status-card');
-    box.appendChild(el('div', 'status-title', c.title || 'สถานะล่าสุด'));
+    box.appendChild(el('div', 'status-title', c.title || homeTx('สถานะล่าสุด', 'Latest status')));
     box.appendChild(el('div', 'status-copy', c.copy || c.text || ''));
     if (c.href) {
-      var a = el('a', 'status-link', 'เปิดดูรายละเอียด / Open details');
+      var a = el('a', 'status-link', homeTx('เปิดดูรายละเอียด', 'Open details'));
       a.href = c.href; a.target = '_top'; box.appendChild(a);
     }
     g.appendChild(box);
@@ -378,13 +382,14 @@ function renderUserStatus(app){
   app.appendChild(g);
 }
 function renderRecentAndHelp(app){
-  app.appendChild(section('รายการล่าสุดหรือพัสดุที่ใช้บ่อย / Recent items', null, 'sec-recent'));
+  var kind = roleKind();
+  app.appendChild(section(homeTx('รายการล่าสุดหรือพัสดุที่ใช้บ่อย', 'Recent or frequently used items'), null, 'sec-recent'));
   var recent = B.recentItems || B.recent || B.frequentItems || [];
   if (!Array.isArray(recent) || !recent.length) {
     var empty = el('div', 'card');
-    empty.appendChild(el('div', 'empty', 'ยังไม่มีรายการล่าสุด · รายการจะแสดงเมื่อเริ่มใช้งาน / No recent items yet.'));
+    empty.appendChild(el('div', 'empty', homeTx('ยังไม่มีรายการล่าสุด รายการจะแสดงเมื่อเริ่มใช้งาน', 'No recent items yet. Items will appear as you start using the system.')));
     if (hasMenuPage('stock')) {
-      var a = el('a', 'btnlike home-empty-action', 'ค้นหารายการพัสดุ / Browse stock');
+      var a = el('a', 'btnlike home-empty-action', homeTx('ค้นหารายการพัสดุ', 'Browse stock'));
       a.href = pageHref('stock'); a.target = '_top'; empty.appendChild(a);
     }
     app.appendChild(empty);
@@ -396,39 +401,63 @@ function renderRecentAndHelp(app){
       var image = item.imageUrl || item.thumbUrl || item.image || '';
       if (image) {
         var img = el('img', 'recent-thumb');
-        img.src = image; img.alt = item.name || item.title || item.code || 'พัสดุ';
+        img.src = image; img.alt = item.name || item.title || item.code || homeTx('พัสดุ', 'Stock item');
         img.loading = 'lazy'; img.decoding = 'async'; row.appendChild(img);
       } else {
         row.appendChild(el('div', 'recent-placeholder', '📦'));
       }
       var main = el('div', 'recent-main');
       main.appendChild(el('div', 'recent-code', item.code || item.id || ''));
-      main.appendChild(el('div', 'recent-name', item.name || item.title || 'รายการพัสดุ'));
+      main.appendChild(el('div', 'recent-name', item.name || item.title || homeTx('รายการพัสดุ', 'Stock item')));
       if (item.meta || item.updated) main.appendChild(el('div', 'meta', item.meta || item.updated));
       row.appendChild(main); box.appendChild(row);
     });
     app.appendChild(box);
   }
 
-  app.appendChild(section('วิธีใช้งานและแจ้งปัญหา / Help & support', null, 'sec-help'));
+  app.appendChild(section(homeTx('วิธีใช้งานและแจ้งปัญหา', 'Help & support'), null, 'sec-help'));
   var help = el('div', 'grid home-help-grid home-help');
+
   var guide = el('div', 'card');
-  guide.appendChild(el('div', 'help-title', 'เริ่มใช้งานอย่างไร / Getting started'));
-  guide.appendChild(el('div', 'help-copy', B.isAdmin ? 'เริ่มจากงานที่รอแอดมินดำเนินการ แล้วตรวจเอกสารก่อนกดยืนยัน' : 'เลือกงานหลักด้านบน หรือใช้เมนูทางลัดเพื่อเริ่มรายการและติดตามสถานะ'));
+  var guideTitle = kind === 'admin'
+    ? homeTx('วิธีเริ่มงาน', 'Getting started')
+    : kind === 'staff'
+      ? homeTx('เริ่มทำรายการ', 'Start a request')
+      : homeTx('เริ่มต้นใช้งาน', 'Get started');
+  var guideCopy = kind === 'admin'
+    ? homeTx('ตรวจงานที่รอ แล้วตรวจรหัส รูปภาพ และจำนวนก่อนอนุมัติหรือดำเนินการต่อ', 'Review pending work, then check the code, image, and quantity before approving or continuing.')
+    : kind === 'staff'
+      ? homeTx('เลือกงาน ตรวจรายการพร้อมรูปภาพ ส่งคำขอ และติดตามสถานะ', 'Choose a task, check the item with its image, submit the request, and track its status.')
+      : homeTx('ค้นหารายการ ตรวจรูปภาพและจำนวน ส่งคำขอ และติดตามสถานะ', 'Browse items, check the image and quantity, submit a request, and track its status.');
+  guide.appendChild(el('div', 'help-title', guideTitle));
+  guide.appendChild(el('div', 'help-copy', guideCopy));
+  var guideLink = el('a', 'home-help-link', kind === 'admin'
+    ? homeTx('เปิดงานที่ต้องดำเนินการ', 'Open pending work')
+    : homeTx('เริ่มรายการใหม่', 'Start a request'));
+  guideLink.href = kind === 'admin' ? adminFirstTarget() : pageHref('index');
+  guideLink.target = '_top';
+  guide.appendChild(guideLink);
   help.appendChild(guide);
+
   var support = el('div', 'card');
-  support.appendChild(el('div', 'help-title', 'แจ้งปัญหา / Report an issue'));
+  support.appendChild(el('div', 'help-title', homeTx('ติดต่อผู้ดูแล', 'Contact support')));
   var email = B.supportEmail || 'phalot.k@tefthailand.com';
   var mail = el('a', null, email); mail.href = 'mailto:' + email;
-  var copy = el('div', 'help-copy', 'หากพบข้อมูลผิดปกติหรือใช้งานไม่ได้ โปรดแจ้งพร้อมรหัสรายการและภาพหน้าจอ / Include the request ID and screenshot.');
+  var copy = el('div', 'help-copy', homeTx(
+    'หากพบปัญหา โปรดแจ้งรหัสรายการ ภาพหน้าจอ และเวลาที่เกิดปัญหา',
+    'If something goes wrong, include the request ID, a screenshot, and the time of the issue.'
+  ));
   support.appendChild(mail); support.appendChild(copy); help.appendChild(support);
+
   var rules = el('div', 'card');
-  rules.appendChild(el('div', 'help-title', 'ความปลอดภัย / Safety'));
-  rules.appendChild(el('div', 'help-copy', 'ตรวจสอบรหัสและจำนวนก่อนยืนยันทุกครั้ง ระบบจะแยกสิทธิ์ตามบทบาทของผู้ใช้'));
+  rules.appendChild(el('div', 'help-title', homeTx('ตรวจสอบก่อนยืนยัน', 'Before confirming')));
+  rules.appendChild(el('div', 'help-copy', homeTx(
+    'ตรวจสอบรหัส รายการ รูปภาพ จำนวน และปลายทางให้ถูกต้องทุกครั้ง',
+    'Check the code, item, image, quantity, and destination before confirming.'
+  )));
   help.appendChild(rules);
   app.appendChild(help);
 }
-
 function render(){
   var app = $('#app'); app.replaceChildren();
   renderHomeHero(app);
@@ -438,7 +467,7 @@ function render(){
 
   if (B.isAdmin && B.admin) renderAdmin(app, B.admin);
 
-  var mh = el('div', 'mh'); mh.appendChild(el('h2', null, 'ทางลัด / Quick actions'));
+  var mh = el('div', 'mh'); mh.appendChild(el('h2', null, homeTx('ทางลัด', 'Quick actions')));
   var box = el('div'); box.style.display = 'none';
   if (B.isAdmin && B.edit) {
     var eb = el('button', 'ghost eb'); eb.innerHTML = svgIcon(PENCIL, 16) + '<span class="long">แก้ไขหน้าแรก</span><span class="short">แก้ไข</span>'; mh.appendChild(eb);
@@ -691,11 +720,11 @@ firstLoad();
 <div id="confirmModal" class="confirm-modal" hidden aria-hidden="true">
   <div class="confirm-modal-backdrop" data-confirm-close></div>
   <section class="confirm-modal-panel" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
-    <h2 id="confirmModalTitle">ยืนยันการดำเนินการ / Confirm action</h2>
+    <h2 id="confirmModalTitle">ยืนยันการดำเนินการ</h2>
     <p id="confirmModalText"></p>
     <div class="confirm-modal-actions">
-      <button type="button" class="btn ghost" data-confirm-close>ปิด / Cancel</button>
-      <button type="button" class="btn" id="confirmModalSubmit">ยืนยัน / Confirm</button>
+      <button type="button" class="btn ghost" data-confirm-close>ยกเลิก</button>
+      <button type="button" class="btn" id="confirmModalSubmit">ยืนยัน</button>
     </div>
   </section>
 </div>
