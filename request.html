@@ -856,11 +856,16 @@ function requestPhoto(code, done){
     .stockPhotoSet(key);
 }
 
+function photoText(th){
+  return window.TEF_LANG === 'en' && window.TEF_T ? window.TEF_T(th) : th;
+}
+
 function photoMarkup(code, name){
   const key = String(code || '').trim();
   const cached = PHOTO_CACHE[key];
   if (cached) return '<img class="line-photo" src="' + cached + '" alt="' + esc((name || key) + ' · ' + key) + '">';
-  return '<span class="line-photo is-empty" data-photo-code="' + esc(key) + '" data-photo-name="' + esc(name || key) + '">กำลังโหลดรูป</span>';
+  const loading = photoText('กำลังโหลดรูป');
+  return '<span class="line-photo is-empty" data-photo-code="' + esc(key) + '" data-photo-name="' + esc(name || key) + '">' + esc(loading) + '</span>';
 }
 
 function hydratePhotos(root){
@@ -876,7 +881,7 @@ function hydratePhotos(root){
         img.alt = (name || code) + ' · ' + code;
         node.replaceWith(img);
       } else {
-        node.textContent = 'ไม่มีรูป';
+        node.textContent = photoText('ไม่มีรูป');
         node.removeAttribute('data-photo-code');
         node.removeAttribute('data-photo-name');
       }
@@ -908,10 +913,10 @@ function showPhotoPanel(panelId, imgId, textId, nameId, code, itemName){
   requestPhoto(code, url => {
     if (PHOTO_PANEL_SEQ[panelId] !== seq || img.alt !== expectedAlt) return;
     if (url) {
-      img.src = url; img.style.display = 'block'; txt.textContent = 'รูปภาพประกอบรายการ';
+      img.src = url; img.style.display = 'block'; txt.textContent = photoText('รูปภาพประกอบรายการ');
     } else {
       panel.classList.add('is-empty');
-      txt.textContent = 'ยังไม่มีรูปของรายการนี้';
+      txt.textContent = photoText('ยังไม่มีรูปของรายการนี้');
     }
   });
 }
