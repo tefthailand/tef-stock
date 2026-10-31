@@ -96,6 +96,7 @@ body{background:var(--tef-bg);color:var(--tef-text);font-family:var(--tef-font);
 .lines .empty{text-align:center;color:var(--tef-text-soft);padding:20px}
 .chip{display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:999px;background:var(--tef-ocean-light);color:var(--tef-ocean-text);font-weight:500}
 .chip.low{background:color-mix(in srgb,var(--tef-danger) 14%,transparent);color:var(--tef-danger)}
+.qin{width:96px;display:inline-block;text-align:right;vertical-align:middle}   /* v35.13 แก้จำนวนในตาราง */
 .del{background:none;border:0;color:var(--tef-text-soft);cursor:pointer;font-size:15px;padding:2px 6px}
 .del:hover{color:var(--tef-danger)}
 
@@ -969,7 +970,7 @@ function addLine(){
   if (!it)      return showErr('ไม่พบรหัส ' + code + ' ในทะเบียน');
   if (qty < 1)  return showErr('จำนวนต้องมากกว่าศูนย์');
   if (qty > it.balance) return showErr('รหัส ' + it.code + ' คงเหลือ ' + it.balance + ' เบิกหรือจ่าย ' + qty + ' ไม่ได้');
-  if (LINES.some(l => l.code === it.code)) return showErr('รหัสนี้อยู่ในรายการแล้ว ลบออกก่อนถ้าจะแก้จำนวน');
+  if (LINES.some(l => l.code === it.code)) return showErr('รหัสนี้อยู่ในรายการแล้ว แก้จำนวนในตารางด้านล่างได้เลย');
 
   LINES.push({ code: it.code, name: it.name, qty: qty,
                cost: MODE === 'dis' ? (Number($('pCost').value) || 0) : 0,
@@ -988,7 +989,10 @@ function renderLines(){
   }
   b.innerHTML = LINES.map((l, i) =>
     '<tr><td class="photo-col">' + photoMarkup(l.code, l.name) + '</td><td>' + esc(l.code) + '</td><td>' + esc(l.name) + (l.units && l.units.length ? '<div class="hint">เครื่อง ' + esc(l.units.join(', ')) + '</div>' : '') + '</td>' +
-    '<td class="num">' + l.qty + ' <span class="chip' + (l.qty === l.balance ? ' low' : '') + '">คงเหลือ ' + l.balance + '</span></td>' +
+    '<td class="num">' + (l.units && l.units.length ? l.qty :   // v35.13 พิมพ์แก้จำนวนได้ (วิทยุนับจากเลขเครื่องที่เลือก)
+      '<input class="form-control form-control-sm qin" id="lq' + i + '" type="number" inputmode="numeric" min="1" max="' + l.balance + '" step="1" value="' + l.qty + '"' +
+      ' onfocus="this.select()" onchange="setLineQty(' + i + ', this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}" aria-label="จำนวน">') +
+      ' <span class="chip' + (l.qty === l.balance ? ' low' : '') + '">คงเหลือ ' + l.balance + '</span></td>' +
     (MODE === 'dis' ? '<td class="num">' + (l.qty * l.cost).toLocaleString('th-TH', {minimumFractionDigits:2}) + '</td>' : '') +
     '<td><button class="del" type="button" onclick="rmLine(' + i + ')" aria-label="ลบ">✕</button></td></tr>'
   ).join('');
@@ -996,6 +1000,17 @@ function renderLines(){
 }
 
 function rmLine(i){ LINES.splice(i, 1); renderLines(); drawUnits(); }
+
+/** v35.13 แก้จำนวนในตารางได้เลย ไม่ต้องลบแล้วเพิ่มใหม่ · ไม่เกินคงเหลือ · ต่ำกว่า 1 = คืนค่าเดิม (ไม่เอารายการ กด ✕) */
+function setLineQty(i, el){
+  const l = LINES[i]; if (!l) return;
+  let n = Math.floor(Number(el.value)), msg = '';
+  if (!(n >= 1)) { n = l.qty; msg = 'จำนวนต้องมากกว่าศูนย์ ถ้าไม่เอารายการนี้ กด ✕'; }
+  else if (n > l.balance) { n = l.balance; msg = 'คงเหลือ ' + l.balance + ' ใส่ได้ไม่เกิน ' + l.balance; }
+  l.qty = n; renderLines();
+  const box = $('lq' + i);
+  if (msg && box) box.insertAdjacentHTML('afterend', '<div class="hint" style="color:var(--tef-danger)">' + esc(msg) + '</div>');
+}
 
 function submitReq(){
   if (!LINES.length) return showErr('กรุณาเพิ่มรายการที่จะเบิกอย่างน้อยหนึ่งรายการ');

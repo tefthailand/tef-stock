@@ -94,6 +94,9 @@ body{margin:0;background:var(--tef-bg);color:var(--tef-text);font-family:var(--t
 .vt .q{display:inline-flex;align-items:center;border:1px solid var(--tef-border);border-radius:8px;overflow:hidden}
 .vt .q button{border:0;background:#fff;width:28px;height:30px;font-size:16px;cursor:pointer}
 .vt .q span{min-width:28px;text-align:center;font-weight:600}
+.vt .q input{width:84px;height:30px;border:0;border-left:1px solid var(--tef-border);border-right:1px solid var(--tef-border);border-radius:0;text-align:center;font-weight:600;font-size:15px;font-family:inherit;background:#fff;color:inherit;padding:0 4px;-moz-appearance:textfield;appearance:textfield}
+.vt .q input::-webkit-outer-spin-button,.vt .q input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.vt .q input:focus{outline:2px solid var(--tef-ocean);outline-offset:-2px}
 .vt .z{color:var(--tef-danger)}
 .mod .foot{padding:12px 18px 18px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .mod .foot .go2{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
@@ -483,7 +486,7 @@ c.items.forEach(function (x) {
 var cur = BASK[x.c] ? BASK[x.c].q : 0;
 rows += '<tr><td>' + (c.grp ? esc(x.sz) : esc(x.c)) + (c.grp ? '<div class="kv">' + esc(x.c) + '</div>' : '') + '</td>' +
 '<td class="n ' + (x.b <= 0 ? 'z' : '') + '">' + x.b + '</td>' +
-'<td>' + (x.b > 0 ? '<span class="q"><button data-a="m" data-c="' + esc(x.c) + '">−</button><span id="q_' + esc(x.c) + '">' + cur + '</span><button data-a="p" data-c="' + esc(x.c) + '">+</button></span>' : '<span class="kv">หมด</span>') + '</td>' + (D.admin ? '<td><button class="btn ghost del" data-c="' + esc(x.c) + '" type="button" style="font-size:12px;padding:4px 8px">ลบรายการ</button></td>' : '') + '</tr>';
+'<td>' + (x.b > 0 ? '<span class="q"><button data-a="m" data-c="' + esc(x.c) + '">−</button><input id="q_' + esc(x.c) + '" type="number" inputmode="numeric" min="0" max="' + x.b + '" step="1" value="' + cur + '" data-c="' + esc(x.c) + '" aria-label="จำนวน"><button data-a="p" data-c="' + esc(x.c) + '">+</button></span>' : '<span class="kv">หมด</span>') + '</td>' + (D.admin ? '<td><button class="btn ghost del" data-c="' + esc(x.c) + '" type="button" style="font-size:12px;padding:4px 8px">ลบรายการ</button></td>' : '') + '</tr>';
 });
 var locs = {}; c.items.forEach(function (x) { if (x.l) locs[x.l] = 1; });
 var conds = {}; c.items.forEach(function (x) { if (x.k && x.k !== 'ยังไม่ตรวจ') conds[x.k] = 1; });
@@ -504,6 +507,13 @@ if (c.rad) radioUnitsInto(c.code);
 $('mClose').addEventListener('click', closeMod);
 Array.prototype.forEach.call($('modBox').querySelectorAll('.q button'), function (b) {
 b.addEventListener('click', function () { step(b.getAttribute('data-c'), b.getAttribute('data-a') === 'p' ? 1 : -1, c); });
+});
+Array.prototype.forEach.call($('modBox').querySelectorAll('.q input'), function (inp) {   // v35.13 พิมพ์จำนวนเองได้ ไม่ต้องกด + ทีละครั้ง
+var code = inp.getAttribute('data-c');
+inp.addEventListener('focus', function () { try { inp.select(); } catch (e) {} });
+inp.addEventListener('input', function () { if (inp.value !== '') setQty(code, inp.value, c); });
+inp.addEventListener('change', function () { var cur = BASK[code] ? BASK[code].q : 0; if (String(inp.value) !== String(cur)) setQty(code, inp.value, c); });   // ไม่ล้างข้อความเตือนซ้ำ
+inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
 });
 var up = $('mUp'); if (up) up.addEventListener('change', function () { uploadOne(up.getAttribute('data-c'), up.files[0], c); });
 Array.prototype.forEach.call($('modBox').querySelectorAll('.del'), function (b) {
@@ -552,12 +562,18 @@ Array.prototype.forEach.call($('mTh').children, function (x) { x.classList.toggl
 }
 function closeMod(){ $('mod').style.display = 'none'; document.body.style.overflow = ''; }
 function step(code, d, c){
+setQty(code, (BASK[code] ? BASK[code].q : 0) + d, c);
+}
+/** v35.13 ตั้งจำนวนตรง ๆ (กด −/+ หรือพิมพ์เอง) · ไม่เกินคงเหลือ · 0 = เอาออกจากตะกร้า */
+function setQty(code, v, c){
 var it = null; c.items.forEach(function (x) { if (x.c === code) it = x; });
 if (!it) return;
-var cur = BASK[code] ? BASK[code].q : 0, nx = Math.max(0, Math.min(it.b, cur + d));
-if (nx === 0) delete BASK[code]; else BASK[code] = { q: nx, n: it.n, b: it.b };
-var el = $('q_' + code); if (el) el.textContent = nx;
+var n = Math.floor(Number(v)); if (!(n > 0)) n = 0;
+var over = n > it.b; if (over) n = it.b;
+if (n === 0) delete BASK[code]; else BASK[code] = { q: n, n: it.n, b: it.b };
+var el = $('q_' + code); if (el && String(el.value) !== String(n)) el.value = n;
 baskUi();
+var mh = $('mHint'); if (mh && over) mh.textContent = 'รหัส ' + code + ' คงเหลือ ' + it.b + ' ใส่ได้ไม่เกิน ' + it.b;
 }
 function baskUi(){
 var codes = Object.keys(BASK), tot = 0; codes.forEach(function (k) { tot += BASK[k].q; });
