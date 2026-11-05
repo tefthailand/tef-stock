@@ -521,6 +521,7 @@ var code = b.getAttribute('data-c');
 twoStep(b, 'กดอีกครั้งเพื่อลบ ' + code, function (btn, orig) {
 google.script.run.withSuccessHandler(function () {
 D.items = (D.items || []).filter(function (x) { return x.c !== code; });
+if (window.TEFAPI && TEFAPI.remember) TEFAPI.remember('stock', D);   // v35.20: เปิดหน้าใหม่ไม่เห็นรายการที่ลบแล้ว
 closeMod(); onList(D);
 }).withFailureHandler(function (e) { btn.disabled = false; btn.textContent = 'ผิดพลาด: ' + (e && e.message || e); }).adminDeleteItem(code, 'ผู้ดูแลลบรายการ (ไม่มีของแล้ว)');
 });
