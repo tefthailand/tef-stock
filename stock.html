@@ -62,8 +62,12 @@ body{margin:0;background:var(--tef-bg);color:var(--tef-text);font-family:var(--t
 .cn{font-weight:600;font-size:14px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .cs{font-size:12px;color:var(--tef-text-soft)}
 .sz{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
-.sz span{font-size:11.5px;background:var(--tef-ocean-light);color:var(--tef-ocean-text);border-radius:6px;padding:2px 6px}
-.sz span.z{background:#F3E4E1;color:var(--tef-danger)}
+.sz button,.sz span{border:1px solid transparent;font:inherit;font-size:12px;background:var(--tef-ocean-light);color:var(--tef-ocean-text);border-radius:8px;padding:4px 8px;line-height:1.25}
+.sz button{cursor:pointer;transition:border-color .15s,background .15s,transform .15s}
+.sz button:hover:not(:disabled){border-color:var(--tef-ocean);transform:translateY(-1px)}
+.sz button.on{background:#D7F0FB;border-color:#2AA8E0;color:#075B82;box-shadow:0 0 0 1px #2AA8E0 inset}
+.sz button.z,.sz button:disabled{background:#F3E4E1;color:var(--tef-danger);cursor:not-allowed;opacity:.82}
+.sz .more-size{background:#EEF2F5;color:#667789}
 .btn{border:0;border-radius:8px;padding:9px 16px;font:inherit;font-weight:500;cursor:pointer;background:var(--tef-navy);color:#fff}
 .btn:hover{background:var(--tef-ocean)}
 .btn.ghost{background:#fff;color:var(--tef-ocean-text);border:1px solid var(--tef-border)}
@@ -173,6 +177,7 @@ var SHOWN = 0, PAGE = 48, CUR = [];
 var PH = {};           // code -> dataURL ภาพย่อ
 var ASKED = {};
 var BASK = {};         // code -> {q, n, b} · v35: จำไว้ใน sessionStorage tef_cart (รีเฟรช/ย้อนกลับไม่หาย · แยกตามเครื่องและแท็บ)
+var PICK = {};          // รหัสการ์ด -> รหัสไซส์ที่เลือกบนการ์ด
 var CART_KEY = 'tef_cart';
 function cartSave(){ try { if (Object.keys(BASK).length) sessionStorage.setItem(CART_KEY, JSON.stringify(BASK)); else sessionStorage.removeItem(CART_KEY); } catch (e) {} }
 /* คืนตะกร้าหลังโหลดรายการ: ตัดรายการที่ไม่มีแล้วหรือหมด และไม่ให้เกินคงเหลือล่าสุด */
@@ -211,8 +216,10 @@ PV = {}; (D.items || []).forEach(function (x) { if (x.p > 0 && x.pv) PV[x.c] = x
 var map = {};
 (D.items || []).forEach(function (it) {
 var sp = splitName(it.n);
-it.base = sp.base; it.sz = sp.size;
-it.key = it.sz ? it.m + '|' + sp.base.replace(/\s+/g, '').toLowerCase() : '';
+it.base = sp.base;
+it.sz = cleanSize(it.x || sp.size);
+var model = skuModel(it);
+it.key = it.sz ? it.m + '|' + (model ? 'sku:' + model.toLowerCase() : 'name:' + sp.base.replace(/\s+/g, '').toLowerCase()) : '';
 if (it.key) { (map[it.key] = map[it.key] || []).push(it); }
 });
 ALL = [];
@@ -249,8 +256,20 @@ hay += ' ' + arr[0].m;
 return { name: name, items: arr, cat: arr[0].m, sub: arr[0].s, bal: tot, ph: ph, code: arr[0].c,
 hay: norm(hay), grp: arr.length > 1, typ: typeOf(arr[0]), sku: skuModel(arr[0]), rad: arr.length === 1 ? arr[0].r : null, year: arr[0].y || ((/\b(19|20)\d\d\b/.exec(name) || [''])[0]) };
 }
-/* รหัสรุ่น = รหัสสินค้าตัดไซส์ท้ายออก เช่น PCC-23Y-M → PCC-23Y */
-function skuModel(it){ var k = it.sk || ''; return it.sz && k.slice(-(it.sz.length + 1)) === '-' + it.sz ? k.slice(0, -(it.sz.length + 1)) : (it.x && k.slice(-(String(it.x).length + 1)) === '-' + it.x ? k.slice(0, -(String(it.x).length + 1)) : k); }
+/* รหัสรุ่น = รหัสสินค้าตัดรหัสไซส์ท้ายออก เช่น PCC26-P01-S38 → PCC26-P01 */
+function cleanSize(s){ return String(s || '').replace(/^\s*(?:size|ไซส์|ไซซ์)\s*[:\-]?\s*/i, '').replace(/\s+/g, ' ').trim(); }
+function sizeToken(s){
+var v = cleanSize(s).toUpperCase().replace(/ทรงเข้ารูป/g, '').replace(/[^A-Z0-9.]/g, '');
+return v.replace(/^XXXL/, '3XL').replace(/^XXL/, '2XL').replace(/^XXS/, '2XS');
+}
+function sizeShort(s){ return sizeToken(s) || cleanSize(s); }
+function skuModel(it){
+var k = String(it.sk || ''), tok = sizeToken(it.sz || it.x);
+if (k && tok && k.toUpperCase().slice(-(tok.length + 1)) === '-' + tok) return k.slice(0, -(tok.length + 1));
+var raw = cleanSize(it.sz || it.x);
+if (k && raw && k.slice(-(raw.length + 1)).toUpperCase() === '-' + raw.toUpperCase()) return k.slice(0, -(raw.length + 1));
+return k;
+}
 /* ประเภทสำหรับแบ่งกลุ่ม: เครื่องแต่งกายใช้คอลัมน์ทรง ที่เหลือใช้หมวดหมู่ */
 function typeOf(it){
 if (it.m !== 'เครื่องแต่งกาย') return it.s || it.m || 'อื่นๆ';
@@ -262,15 +281,20 @@ if (t === 'ปลอกแขน' || /armband|ปลอกแขน/.test(n)) re
 if (t === 'เสื้อกั๊ก' || /vest|reflective|สะท้อนแสง/.test(n)) return 'เสื้อกั๊ก / สะท้อนแสง';
 return 'เสื้ออื่นๆ';
 }
-var SZ1 = /\s+(?:size|ไซส์|ไซซ์)\s*[:\-]?\s*([A-Za-z0-9.\/\-]+)\s*$/i;
-var SZ2 = /\s+(XXS|XS|SS|S|M|L|XL|XXL|2XL|3XL|4XL|5XL|2X)\s*$/i;
+var SZ1 = /\s+(?:size|ไซส์|ไซซ์)\s*[:\-]?\s*((?:3XS|2XS|XXS|XS|SS|S|M|L|XL|XXL|2XL|3XL|4XL|5XL|2X)(?:\s*\([^)]*\))?(?:\s*ทรงเข้ารูป)?)\s*$/i;
+var SZ2 = /\s+(3XS|2XS|XXS|XS|SS|S|M|L|XL|XXL|2XL|3XL|4XL|5XL|2X)\s*$/i;
 function splitName(n){
-var m = SZ1.exec(n); if (m) return { base: n.slice(0, m.index), size: m[1].toUpperCase() };
-m = SZ2.exec(n); if (m) return { base: n.slice(0, m.index), size: m[1].toUpperCase() };
+var m = SZ1.exec(n); if (m) return { base: n.slice(0, m.index), size: cleanSize(m[1]) };
+m = SZ2.exec(n); if (m) return { base: n.slice(0, m.index), size: cleanSize(m[1]) };
 return { base: n, size: '' };
 }
-var ORDER = ['XXS','XS','SS','S','M','L','XL','XXL','2X','2XL','3XL','4XL','5XL'];
-function szRank(s){ var i = ORDER.indexOf(s); if (i >= 0) return i; var n = parseFloat(s); return isNaN(n) ? 99 : 100 + n; }
+var ORDER = ['3XS','2XS','XXS','XS','SS','S','M','L','XL','XXL','2X','2XL','3XL','4XL','5XL'];
+function szRank(s){
+var chest = /\(\s*(\d+(?:\.\d+)?)/.exec(String(s || '')); if (chest) return Number(chest[1]);
+var tok = sizeToken(s).replace(/\d+$/, ''), i = ORDER.indexOf(tok);
+if (i >= 0) return 100 + i;
+var n = parseFloat(s); return isNaN(n) ? 999 : 200 + n;
+}
 function norm(s){ return String(s || '').toLowerCase().replace(/[\u2018\u2019\u02bc\u0060]/g, "'").replace(/\s+/g, ' '); }
 var SYN = {
 'pcc': ["princess's cup","princess cup","princess","ปรินเซส","pcc"],
@@ -419,10 +443,15 @@ var gcnt = {}; CUR.forEach(function (c) { var k = c.cat + '|' + c.typ; gcnt[k] =
 CUR.slice(0, SHOWN).forEach(function (c, i) {
 var gk = c.cat + '|' + c.typ;
 if (gk !== lastG) { lastG = gk; h += '<div class="sec">' + esc((CAT === 'ทั้งหมด' && c.typ !== c.cat ? c.cat + ' · ' : '') + c.typ) + '<small>' + gcnt[gk] + ' รายการ</small></div>'; }
+var selected = PICK[c.code] || '';
+if (!selected) c.items.some(function (x) { if (BASK[x.c]) { selected = x.c; PICK[c.code] = x.c; return true; } return false; });
 var szs = '';
 if (c.grp) {
-c.items.slice(0, 8).forEach(function (x) { szs += '<span class="' + (x.b <= 0 ? 'z' : '') + '">' + esc(x.sz) + ' ' + x.b + '</span>'; });
-if (c.items.length > 8) szs += '<span>+' + (c.items.length - 8) + '</span>';
+c.items.slice(0, 12).forEach(function (x) {
+var isOn = selected === x.c, label = sizeShort(x.sz);
+szs += '<button class="size-opt ' + (x.b <= 0 ? 'z ' : '') + (isOn ? 'on' : '') + '" type="button" data-code="' + esc(x.c) + '" title="' + esc(x.sz + ' · คงเหลือ ' + x.b) + '" aria-pressed="' + (isOn ? 'true' : 'false') + '"' + (x.b <= 0 ? ' disabled' : '') + '>' + esc(label) + ' ' + x.b + '</button>';
+});
+if (c.items.length > 12) szs += '<span class="more-size">+' + (c.items.length - 12) + '</span>';
 }
 h += '<div class="card ' + (c.bal <= 0 ? 'zero' : '') + '" data-i="' + i + '">' +
 '<div class="ph' + (c.ph ? '' : ' nop') + '" data-code="' + esc(c.ph) + '">' + (c.ph && PH[c.ph] ? '<img src="' + PH[c.ph] + '" alt="">' : ICON) + '</div>' +
@@ -435,7 +464,32 @@ h += '<div class="card ' + (c.bal <= 0 ? 'zero' : '') + '" data-i="' + i + '">' 
 });
 g.innerHTML = h || '<div class="empty" style="grid-column:1/-1">ไม่พบรายการ</div>';
 Array.prototype.forEach.call(g.querySelectorAll('.card'), function (el) {
-el.addEventListener('click', function () { openMod(CUR[Number(el.getAttribute('data-i'))]); });
+var c = CUR[Number(el.getAttribute('data-i'))];
+el.addEventListener('click', function (e) {
+var opt = e.target.closest ? e.target.closest('.size-opt') : null;
+if (opt) {
+e.stopPropagation();
+if (opt.disabled) return;
+PICK[c.code] = opt.getAttribute('data-code');
+draw();
+return;
+}
+var add = e.target.closest ? e.target.closest('.add') : null;
+if (add) {
+e.stopPropagation();
+if (!(c.bal > 0)) { openMod(c); return; }
+if (c.grp) {
+var code = PICK[c.code];
+if (!code) { alert(disTxt('กรุณาเลือกไซส์ก่อนใส่ตะกร้า', 'Please select a size first')); return; }
+step(code, 1, c);
+draw();
+return;
+}
+step(c.items[0].c, 1, c);
+return;
+}
+openMod(c);
+});
 });
 $('more').style.display = CUR.length > SHOWN ? '' : 'none';
 $('moreBtn').textContent = 'แสดงเพิ่ม (เหลืออีก ' + (CUR.length - SHOWN) + ')';
