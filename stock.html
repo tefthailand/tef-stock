@@ -68,6 +68,11 @@ body{margin:0;background:var(--tef-bg);color:var(--tef-text);font-family:var(--t
 .sz button.on{background:#D7F0FB;border-color:#2AA8E0;color:#075B82;box-shadow:0 0 0 1px #2AA8E0 inset}
 .sz button.z,.sz button:disabled{background:#F3E4E1;color:var(--tef-danger);cursor:not-allowed;opacity:.82}
 .sz .more-size{background:#EEF2F5;color:#667789}
+/* ยอด PCC26-RSU-PR ที่ กกท. ขอเบิกแล้ว รอตัดยอดภายหลัง */
+.card.pending-cut .bd{background:#B3341F}
+.card.pending-cut .cq{color:#B3341F}
+.card.pending-cut .sz button:not(:disabled){background:#F8E3DF;border-color:#E7AAA0;color:#A72D20}
+.card.pending-cut .sz button.on{background:#F2C8C1;border-color:#B3341F;color:#7F1F15;box-shadow:0 0 0 1px #B3341F inset}
 .btn{border:0;border-radius:8px;padding:9px 16px;font:inherit;font-weight:500;cursor:pointer;background:var(--tef-navy);color:#fff}
 .btn:hover{background:var(--tef-ocean)}
 .btn.ghost{background:#fff;color:var(--tef-ocean-text);border:1px solid var(--tef-border)}
@@ -444,6 +449,7 @@ CUR.slice(0, SHOWN).forEach(function (c, i) {
 var gk = c.cat + '|' + c.typ;
 if (gk !== lastG) { lastG = gk; h += '<div class="sec">' + esc((CAT === 'ทั้งหมด' && c.typ !== c.cat ? c.cat + ' · ' : '') + c.typ) + '<small>' + gcnt[gk] + ' รายการ</small></div>'; }
 var selected = PICK[c.code] || '';
+var pendingCut = c.sku === 'PCC26-RSU-PR';
 if (!selected) c.items.some(function (x) { if (BASK[x.c]) { selected = x.c; PICK[c.code] = x.c; return true; } return false; });
 var szs = '';
 if (c.grp) {
@@ -453,7 +459,7 @@ szs += '<button class="size-opt ' + (x.b <= 0 ? 'z ' : '') + (isOn ? 'on' : '') 
 });
 if (c.items.length > 12) szs += '<span class="more-size">+' + (c.items.length - 12) + '</span>';
 }
-h += '<div class="card ' + (c.bal <= 0 ? 'zero' : '') + '" data-i="' + i + '">' +
+h += '<div class="card ' + (pendingCut ? 'pending-cut ' : '') + (c.bal <= 0 ? 'zero' : '') + '" data-i="' + i + '">' +
 '<div class="ph' + (c.ph ? '' : ' nop') + '" data-code="' + esc(c.ph) + '">' + (c.ph && PH[c.ph] ? '<img src="' + PH[c.ph] + '" alt="">' : ICON) + '</div>' +
 '<span class="bd ' + balCls(c.bal) + '">' + (c.bal <= 0 ? 'หมด' : 'เหลือ ' + c.bal) + '</span>' +
 '<div class="cb"><div class="cn">' + esc(c.name) + '</div>' +
